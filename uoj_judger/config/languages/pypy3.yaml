@@ -1,0 +1,42 @@
+# PyPy3 语言配置
+language:
+  id: "PyPy3"
+  display_name: "Python 3 (PyPy 3.11)"
+  description: "PyPy 3.11 - Fast Python Implementation"
+  version: "PyPy3"
+  
+  extensions: [".py"]
+  needs_compile: false
+
+runtime:
+  command: "/usr/bin/pypy3"
+  args: ["{source}"]
+  sandbox_type: "python"
+  
+  time_multiplier: 2.0
+  memory_multiplier: 2.0
+  base_memory: 64
+
+syscall:
+  runtime:
+    allow:
+      - gettid: -1
+      - set_tid_address: 1
+      - set_robust_list: 15
+      - futex: -1
+      - getdents64: -1
+      - prlimit64: -1
+      - getpid: -1
+      - sysinfo: -1
+      - getrandom: -1
+      - sigaltstack: -1
+    readable_paths:
+      - "/usr/lib/pypy3/"
+      - "/usr/share/pypy3/"
+      - "/usr/lib/python3/"
+      - "/proc/"
+
+env:
+  runtime:
+    PYTHONDONTWRITEBYTECODE: "1"
+

@@ -1,0 +1,144 @@
+# Lean 4.23.0 语言配置 (含 Mathlib)
+# 包含: Mathlib, Batteries, Aesop, Qq, ProofWidgets, ImportGraph
+# 编译时间约 2-3 秒
+
+language:
+  id: "Lean4.23.0"
+  aliases: ["Lean4", "Lean"]
+  display_name: "Lean 4"
+  description: "Lean 4.23.0 + Mathlib"
+  version: "4.23.0"
+  
+  extensions: [".lean"]
+  needs_compile: true
+
+# 编译配置
+compiler:
+  command: "/usr/lean/v4-23-0/compile_lean.sh"
+  args: ["{work_path}"]
+  
+  # 编译资源限制
+  time_limit: 30
+  memory_limit: 8192      # 8GB（Mathlib 编译需要约 5GB）
+  output_limit: 262144    # 256MB (Batteries 二进制约 177MB)
+  sandbox_type: "leancompile"
+
+# 运行配置
+runtime:
+  executable: "answer"
+  sandbox_type: "lean"
+  time_multiplier: 1.0
+  memory_multiplier: 1.0
+  base_memory: 32
+
+# Syscall 策略
+syscall:
+  compiler:
+    allow:
+      - clone: -1
+      - fork: -1
+      - vfork: -1
+      - execve: -1
+      - wait4: -1
+      - getpid: -1
+      - sysinfo: -1
+      - gettid: -1
+      - futex: -1
+      - set_tid_address: -1
+      - epoll_ctl: -1
+      - set_robust_list: -1
+      - epoll_pwait: -1
+      - eventfd2: -1
+      - epoll_create1: -1
+      - pipe2: -1
+      - prlimit64: -1
+      - getrandom: -1
+      - io_uring_setup: -1
+      - flock: -1
+      - rename: -1
+      - mkdir: -1
+    readable_paths:
+      - "/usr/"
+      - "/lib/"
+      - "/lib64/"
+      - "/bin/"
+      - "/sbin/"
+      - "/proc/"
+      - "/sys/"
+      - "/dev/"
+      - "/tmp/"
+      - "/etc/ld.so.cache"
+      - "/etc/ld.so.conf"
+    writable_paths:
+      - "/tmp/"
+    execute_paths:
+      - "/usr/"
+      - "/bin/"
+      - "/lib/"
+      - "/lib64/"
+    allow_clone: true
+    allow_exec: true
+    use_namespace: true
+    use_landlock: true
+    
+  runtime:
+    allow:
+      - read: -1
+      - write: -1
+      - open: -1
+      - close: -1
+      - openat: -1
+      - fstat: -1
+      - pread64: -1
+      - access: -1
+      - brk: -1
+      - mmap: -1
+      - munmap: -1
+      - mprotect: -1
+      - madvise: -1
+      - io_uring_setup: -1
+      - io_uring_enter: -1
+      - clone: -1
+      - clone3: -1
+      - gettid: -1
+      - getpid: -1
+      - futex: -1
+      - set_tid_address: -1
+      - set_robust_list: -1
+      - tgkill: -1
+      - nanosleep: -1
+      - rt_sigaction: -1
+      - rt_sigprocmask: -1
+      - rt_sigreturn: -1
+      - sigaltstack: -1
+      - epoll_create1: -1
+      - epoll_ctl: -1
+      - epoll_pwait: -1
+      - eventfd2: -1
+      - pipe2: -1
+      - sysinfo: -1
+      - arch_prctl: -1
+      - prlimit64: -1
+      - getrandom: -1
+      - exit: -1
+      - exit_group: -1
+      
+    readable_paths:
+      - "/usr/local/elan/toolchains/"
+      - "/proc/"
+      - "/sys/"
+      
+    execute_paths:
+      - "/usr/local/elan/"
+      
+    allow_clone: true
+    use_landlock: false
+    use_ptrace: true
+
+env:
+  compile:
+    ELAN_HOME: "/usr/local/elan"
+    PATH: "/usr/local/elan/bin:/usr/bin:/bin"
+    HOME: "/tmp"
+  runtime: {}
+

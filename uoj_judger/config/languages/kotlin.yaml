@@ -1,0 +1,63 @@
+# Kotlin 语言配置
+language:
+  id: "Kotlin"
+  display_name: "Kotlin"
+  description: "Kotlin Programming Language (JVM)"
+  version: "Kotlin"
+  
+  extensions: [".kt"]
+  needs_compile: true
+  needs_main_class: true
+  default_main_class: "MainKt"
+
+compiler:
+  command: "/usr/bin/kotlinc"
+  args: ["{source}", "-include-runtime", "-d", "{output}.jar"]
+  time_limit: 120
+  memory_limit: 2048
+  sandbox_type: "compiler"
+
+runtime:
+  command: "/usr/bin/java"
+  args: ["-jar", "{output}.jar"]
+  executable: "answer.jar"
+  sandbox_type: "java"
+  
+  time_multiplier: 2.0
+  memory_multiplier: 2.0
+  base_memory: 128
+
+syscall:
+  runtime:
+    allow:
+      - gettid: -1
+      - set_tid_address: 1
+      - set_robust_list: 15
+      - futex: -1
+      - clone: -1
+      - clone3: -1
+      - uname: -1
+      - getdents64: 4
+      - clock_getres: -1
+      - sched_getaffinity: -1
+      - sched_yield: -1
+      - prlimit64: -1
+      - getpid: -1
+      - sysinfo: -1
+      - prctl: -1
+      - nanosleep: -1
+    soft_ban:
+      - socket
+      - connect
+    readable_paths:
+      - "/usr/lib/jvm/"
+      - "/usr/share/kotlin/"
+      - "/proc/"
+    allow_clone: true
+
+env:
+  compile:
+    JAVA_HOME: "/usr/lib/jvm/java-17-openjdk-amd64"
+  runtime:
+    JAVA_HOME: "/usr/lib/jvm/java-17-openjdk-amd64"
+

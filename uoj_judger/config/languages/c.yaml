@@ -1,0 +1,32 @@
+# C 语言配置
+language:
+  id: "C"
+  display_name: "C"
+  description: "GNU C Compiler"
+  
+  extensions: [".c"]
+  needs_compile: true
+  
+  check_illegal_keywords: true
+  illegal_keywords: ["__asm", "__asm__", "asm"]
+
+compiler:
+  command: "/usr/bin/gcc"
+  args: ["-o", "{output}", "-x", "c", "{source}", "-lm", "-O2", "-DONLINE_JUDGE"]
+  time_limit: 15
+  memory_limit: 512
+  sandbox_type: "compiler"
+
+runtime:
+  sandbox_type: "default"
+  time_multiplier: 1.0
+  memory_multiplier: 1.0
+  base_memory: 0
+
+syscall:
+  runtime: {}
+  compiler: {}
+
+env:
+  compile: {}
+  runtime: {}

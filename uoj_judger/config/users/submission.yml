@@ -1,0 +1,112 @@
+# 用户提交运行时配置
+# 资源限制（time_limit, memory_limit, output_limit）来自题目配置 problem.conf
+name: submission
+
+# 文件系统沙箱
+sandbox:
+  mode: pivot_root          # 使用 pivot_root 创建最小根（最安全）
+  readonly:
+    - /usr
+    - /lib
+    - /lib64
+    - /etc/ld.so.cache
+    - /etc/localtime
+    - /etc/ld.so.conf
+    - /etc/ld.so.conf.d
+    - /lib/x86_64-linux-gnu/
+    - /usr/lib/x86_64-linux-gnu/
+    - /etc/timezone
+    - /usr/share/zoneinfo/
+    - /dev/random
+    - /dev/urandom
+    - /proc/meminfo
+  writable: []
+  tmpfs:
+    /tmp: 16m
+    /dev: 4m
+  devices:
+    - /dev/null
+    - /dev/urandom
+    - /dev/zero
+
+seccomp:
+  enabled: true
+  kill_on_violation: true
+  allow:
+    # 基础 IO
+    - read
+    - write
+    - open
+    - close
+    - openat
+    - fstat
+    - newfstatat
+    - stat
+    - lstat
+    - lseek
+    - access
+    - pread64
+    - pwrite64
+    - readv
+    - writev
+    - dup
+    - dup2
+    - dup3
+    - fcntl
+    - ioctl
+    # 内存管理
+    - mmap
+    - mprotect
+    - munmap
+    - brk
+    - madvise
+    - mremap
+    # 进程/线程
+    - exit
+    - exit_group
+    - getpid
+    - gettid
+    - futex
+    - set_tid_address
+    - set_robust_list
+    - clone
+    - clone3
+    - tgkill
+    # 信号
+    - rt_sigaction
+    - rt_sigprocmask
+    - rt_sigreturn
+    - sigaltstack
+    # 时间
+    - clock_gettime
+    - gettimeofday
+    - nanosleep
+    # 系统信息
+    - arch_prctl
+    - prlimit64
+    - getrandom
+    - uname
+    - sysinfo
+    - rseq
+    - getcwd
+    # 执行
+    - execve
+    - execveat
+    # IO 多路复用（Lean 运行时需要）
+    - epoll_create1
+    - epoll_ctl
+    - epoll_wait
+    - epoll_pwait
+    - eventfd2
+    - pipe2
+    # io_uring（Lean 使用）
+    - io_uring_setup
+    - io_uring_enter
+    - io_uring_register
+
+namespace:
+  enabled: true
+  mount: true
+  network: true
+  ipc: true
+  uts: true

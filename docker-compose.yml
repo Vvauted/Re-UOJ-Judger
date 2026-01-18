@@ -1,0 +1,41 @@
+services:
+  judger:
+    image: uoj-judger-new:latest
+    container_name: uoj-judger
+    restart: unless-stopped
+    
+    # 必需的 Linux capabilities（用于沙箱）
+    cap_add:
+      - SYS_ADMIN      # mount namespace, pivot_root
+      - SYS_PTRACE     # ptrace (备用)
+      - NET_ADMIN      # network namespace
+      - MKNOD          # 创建设备节点
+    
+    # 安全选项
+    security_opt:
+      - seccomp:unconfined   # 允许 seccomp-bpf
+      - apparmor:unconfined  # 禁用 apparmor
+    
+    environment:
+      - JUDGER_NAME=compose_judger
+      - JUDGER_PASSWORD=_judger_password_
+      - UOJ_HOST=http://uoj-web
+    
+    # 使用 privileged 模式获得完整 cgroup 控制
+    privileged: true
+    
+    volumes:
+      # 配置文件（可外部修改）
+      - ./uoj_judger/config/users:/config:ro
+      # 题目数据（使用 UOJ 的数据目录）
+      - /root/oj/UOJ-System/uoj_data/web/data:/var/uoj_data_copy:rw
+      # cgroup v2 (可写)
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    
+    networks:
+      - uoj-network
+
+networks:
+  uoj-network:
+    external: true
+    name: uoj-system_default

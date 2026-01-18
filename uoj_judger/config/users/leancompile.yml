@@ -1,0 +1,44 @@
+# leancompile.yml - Lean 编译器权限
+# 警告：Lean 编译可以执行代码（#eval），必须使用沙箱！
+name: leancompile
+
+seccomp:
+  enabled: false  # Lean/LLVM 需要多种 syscall（后续可细化）
+
+namespace:
+  enabled: true
+  mount: true
+  network: true   # 禁止网络
+  ipc: true
+
+cgroup:
+  enabled: true
+  max_processes: 256       # LLVM 链接需要多线程
+  memory_limit: 8589934592 # 8GB 物理内存限制（bytes）
+
+sandbox:
+  mode: pivot_root
+  readonly:
+    # 基础系统
+    - /usr
+    - /lib
+    - /lib64
+    - /bin
+    # 动态链接器配置
+    - /etc/ld.so.cache
+    - /etc/ld.so.conf
+    - /etc/ld.so.conf.d
+    # glibc/Lean 需要 /proc
+    - /proc
+  writable: []
+  tmpfs:
+    /tmp: 512m
+    /dev: 4m
+  devices:
+    - /dev/null
+    - /dev/urandom
+    - /dev/zero
+
+# 关键：禁用地址空间限制（LLVM 需要大量虚拟内存映射共享库）
+rlimit:
+  as: -1

@@ -1,0 +1,47 @@
+# Python 2 语言配置
+language:
+  id: "Python2"
+  display_name: "Python 2"
+  description: "Python 2 Interpreter"
+  version: "2.7"
+  
+  extensions: [".py"]
+  needs_compile: true   # 编译成 .pyc
+
+compiler:
+  command: "/usr/bin/python2"
+  args: ["-c", "import py_compile; py_compile.compile('{source}', '{output}', doraise=True)"]
+  time_limit: 10
+  memory_limit: 256
+  sandbox_type: "compiler"
+
+runtime:
+  command: "/usr/bin/python2"
+  args: ["-B", "{program}"]
+  sandbox_type: "python2"
+  
+  time_multiplier: 2.0
+  memory_multiplier: 2.0
+  base_memory: 32
+
+syscall:
+  runtime:
+    allow:
+      - set_tid_address: 1
+      - set_robust_list: 1
+      - futex: -1
+      - getdents: -1
+      - getdents64: -1
+      - getrandom: -1
+      - prlimit64: -1
+      - getpid: -1
+      - sysinfo: -1
+    readable_paths:
+      - "/usr/bin/python2"
+      - "/usr/lib/python2.7/"
+
+env:
+  compile: {}
+  runtime:
+    PYTHONDONTWRITEBYTECODE: "1"
+    PYTHONUNBUFFERED: "1"

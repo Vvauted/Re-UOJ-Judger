@@ -1,0 +1,31 @@
+# Fortran 2018 语言配置
+language:
+  id: "Fortran2018"
+  display_name: "Fortran 2018"
+  description: "GNU Fortran Compiler with Fortran 2018 standard"
+  version: "Fortran2018"
+  
+  extensions: [".f", ".f90", ".f95", ".f18", ".for"]
+  needs_compile: true
+
+compiler:
+  command: "/usr/bin/gfortran"
+  args: ["-o", "{output}", "{source}", "-O2", "-std=f2018"]
+  time_limit: 15
+  memory_limit: 512
+  sandbox_type: "compiler"
+
+runtime:
+  sandbox_type: "default"
+  time_multiplier: 1.0
+  memory_multiplier: 1.0
+  base_memory: 0
+
+syscall:
+  runtime: {}
+  compiler: {}
+
+env:
+  compile: {}
+  runtime: {}
+

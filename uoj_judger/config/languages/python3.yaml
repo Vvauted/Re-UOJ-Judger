@@ -1,0 +1,92 @@
+# Python 3 语言配置
+language:
+  id: "Python3"
+  display_name: "Python 3"
+  description: "Python 3 Interpreter"
+  version: "3.8"
+  
+  extensions: [".py"]
+  needs_compile: true   # 编译成 .pyc
+
+compiler:
+  command: "/usr/bin/python3"
+  args:
+    - "-c"
+    - "import py_compile; py_compile.compile('{source}', '{output}', doraise=True)"
+  time_limit: 10
+  memory_limit: 256
+  sandbox_type: "compiler"
+
+runtime:
+  command: "/usr/bin/python3"
+  args: ["-B", "{program}"]
+  sandbox_type: "python3"
+  
+  time_multiplier: 2.0
+  memory_multiplier: 2.0
+  base_memory: 32
+
+syscall:
+  runtime:
+    allow:
+      # 基础 syscall
+      - read: -1
+      - write: -1
+      - open: -1
+      - close: -1
+      - openat: -1
+      - fstat: -1
+      - stat: -1
+      - lstat: -1
+      - lseek: -1
+      - mmap: -1
+      - mprotect: -1
+      - munmap: -1
+      - brk: -1
+      - access: -1
+      - fcntl: -1
+      - dup: -1
+      - dup2: -1
+      - ioctl: -1
+      - getcwd: -1
+      - readlink: -1
+      # Python 需要的
+      - set_tid_address: -1
+      - set_robust_list: -1
+      - futex: -1
+      - getdents: -1
+      - getdents64: -1
+      - getrandom: -1
+      - prlimit64: -1
+      - getpid: -1
+      - sysinfo: -1
+      - gettid: -1
+      - rt_sigaction: -1
+      - rt_sigprocmask: -1
+      - sigaltstack: -1
+      - arch_prctl: -1
+      - clock_gettime: -1
+      - gettimeofday: -1
+      - exit: -1
+      - exit_group: -1
+      - execve: -1
+      - getuid: -1
+      - geteuid: -1
+      - getgid: -1
+      - getegid: -1
+      - pread64: -1
+    readable_paths:
+      - "/usr/bin/python3"
+      - "/usr/lib/python3/"
+      - "/usr/lib/python3.8/"
+      - "/usr/local/lib/python3.8/"
+    
+    # Python 需要访问 /proc
+    use_landlock: false
+    use_ptrace: false
+
+env:
+  compile: {}
+  runtime:
+    PYTHONDONTWRITEBYTECODE: "1"
+    PYTHONUNBUFFERED: "1"

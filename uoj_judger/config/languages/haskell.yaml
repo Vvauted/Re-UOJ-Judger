@@ -1,0 +1,31 @@
+# Haskell 语言配置
+language:
+  id: "Haskell"
+  display_name: "Haskell"
+  description: "Glasgow Haskell Compiler (GHC)"
+  version: "Haskell"
+  
+  extensions: [".hs"]
+  needs_compile: true
+
+compiler:
+  command: "/usr/bin/ghc"
+  args: ["-o", "{output}", "{source}", "-O2"]
+  time_limit: 60
+  memory_limit: 2048
+  sandbox_type: "compiler"
+
+runtime:
+  sandbox_type: "default"
+  time_multiplier: 2.0
+  memory_multiplier: 2.0
+  base_memory: 32
+
+syscall:
+  runtime: {}
+  compiler: {}
+
+env:
+  compile: {}
+  runtime: {}
+

@@ -1,0 +1,24 @@
+# Ruby 语言配置
+language:
+  id: "Ruby"
+  display_name: "Ruby"
+  description: "Ruby Programming Language"
+  version: "Ruby"
+  
+  extensions: [".rb"]
+  needs_compile: false
+
+runtime:
+  command: "/usr/bin/ruby"
+  args: ["{source}"]
+  sandbox_type: "default"
+  time_multiplier: 3.0
+  memory_multiplier: 2.0
+  base_memory: 32
+
+syscall:
+  runtime: {}
+
+env:
+  runtime: {}
+

@@ -1,0 +1,71 @@
+# Java 21 语言配置
+language:
+  id: "Java21"
+  display_name: "Java 21"
+  description: "OpenJDK 21"
+  version: "21"
+  
+  extensions: [".java"]
+  needs_compile: true
+  needs_main_class: true
+  default_main_class: "Main"
+
+compiler:
+  command: "/usr/lib/jvm/java-21-openjdk-amd64/bin/javac"
+  args: ["-encoding", "UTF-8", "{main_class}.java"]
+  time_limit: 30
+  memory_limit: 1024
+  sandbox_type: "compiler"
+
+runtime:
+  command: "/usr/lib/jvm/java-21-openjdk-amd64/bin/java"
+  args: ["-Xmx1024m", "-Xss1024m", "{main_class}"]
+  sandbox_type: "java"
+  
+  time_multiplier: 2.0
+  memory_multiplier: 2.0
+  base_memory: 128
+
+syscall:
+  runtime:
+    allow:
+      - gettid: -1
+      - set_tid_address: 1
+      - set_robust_list: 15
+      - futex: -1
+      - clone: -1
+      - clone3: -1
+      - uname: -1
+      - getdents: 4
+      - getdents64: 4
+      - clock_getres: -1
+      - setrlimit: 1
+      - sched_getaffinity: -1
+      - sched_yield: -1
+      - prlimit64: -1
+      - getpid: -1
+      - sysinfo: -1
+      - prctl: -1
+      - nanosleep: -1
+      - clock_nanosleep: -1
+      - rseq: -1
+    soft_ban:
+      - socket
+      - connect
+      - geteuid
+      - getuid
+    readable_paths:
+      - "/usr/lib/jvm/java-21-openjdk-amd64/"
+      - "/sys/devices/system/cpu/"
+      - "/proc/"
+      - "/sys/fs/cgroup/"
+      - "/usr/share/java/"
+      - "/usr/lib/locale/"
+    allow_clone: true
+
+env:
+  compile:
+    JAVA_HOME: "/usr/lib/jvm/java-21-openjdk-amd64"
+  runtime:
+    JAVA_HOME: "/usr/lib/jvm/java-21-openjdk-amd64"
+

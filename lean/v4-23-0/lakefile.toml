@@ -1,0 +1,30 @@
+name = "v4-23-0"
+packagesDir = "/usr/lean/v4-23-0/.lake/packages"
+version = "0.1.0"
+defaultTargets = ["answer"]
+
+[[require]]
+name = "mathlib"
+scope = "leanprover-community"
+rev = "v4.23.0"
+
+[[require]]
+name = "Loom"
+git = "https://github.com/verse-lab/loom"
+rev = "v4.23.0"
+
+[[require]]
+name = "auto"
+scope = "leanprover-community"
+rev = "2c088e7617d6e2018386de23b5df3b127fae4634"
+
+# 用户代码入口
+[[lean_exe]]
+name = "answer"
+root = "Answer"
+
+[[lean_exe]]
+name = "lake-build-offline"
+root = "LakeBuildOffline"
+supportInterpreter = true
+

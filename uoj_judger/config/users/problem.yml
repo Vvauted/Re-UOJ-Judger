@@ -1,0 +1,55 @@
+# problem.yml - Checker/Validator/Interactor 权限配置
+# 
+# 安全策略：
+# - seccomp: 禁用 (checker 是题目作者提供的可信程序)
+# - pivot_root: 启用 (只能访问挂载的目录，无法访问其他文件)
+# - namespace: 启用 (隔离网络、IPC)
+# - cgroup: 启用 (限制进程数和内存)
+#
+# 这意味着 checker 可以执行任何系统调用，但只能访问以下目录：
+# - /usr, /lib, /lib64 (系统库)
+# - /bin (基础命令)
+# - /opt/uoj_judger (judger 程序)
+# - /var/uoj_data_copy (题目数据)
+# - /tmp (临时文件)
+
+name: problem
+
+seccomp:
+  enabled: false  # Checker 可信，不限制系统调用
+
+namespace:
+  enabled: true
+  mount: true     # 启用 mount namespace (pivot_root 需要)
+  network: true   # 禁止网络访问
+  ipc: true       # 隔离 IPC
+
+cgroup:
+  enabled: true
+  max_processes: 32   # 允许多进程 (某些 checker 需要)
+  memory_limit: 4G    # 4GB 内存限制
+
+sandbox:
+  mode: pivot_root    # 关键：使用 pivot_root 隔离文件系统
+  readonly:
+    # 系统库和工具
+    - /usr
+    - /lib
+    - /lib64
+    - /bin
+    - /etc/ld.so.cache
+    - /etc/ld.so.conf
+    - /etc/ld.so.conf.d
+    - /etc/localtime
+    - /etc/timezone
+    # 判题相关目录
+    - /var/uoj_data_copy   # 题目数据
+    - /opt/uoj_judger      # judger 程序
+  writable: []
+  tmpfs:
+    /tmp: 64m   # 64MB 临时空间
+    /dev: 4m
+  devices:
+    - /dev/null
+    - /dev/urandom
+    - /dev/zero

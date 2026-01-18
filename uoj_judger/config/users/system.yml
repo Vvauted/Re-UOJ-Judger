@@ -1,0 +1,15 @@
+# system.yml - 系统级权限（judger 主进程）
+name: system
+
+seccomp:
+  enabled: false
+
+namespace:
+  enabled: false
+
+cgroup:
+  enabled: false
+
+# 完整文件系统访问
+sandbox:
+  mode: none

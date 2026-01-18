@@ -1,0 +1,22 @@
+# 编译产物
+*.o
+*.a
+main_judger
+uoj_judger/builtin/checker/[a-z]*[^.cpp]
+uoj_judger/builtin/judger/judger
+
+# 工作目录
+uoj_judger/data/
+uoj_judger/work/
+uoj_judger/result/
+
+# 日志
+*.log
+log/
+
+# IDE
+.vscode/
+.idea/
+
+# Docker 数据
+*.tar

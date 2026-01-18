@@ -1,0 +1,39 @@
+# compiler.yml - 通用编译器权限
+name: compiler
+
+seccomp:
+  enabled: false  # 编译器需要多种 syscall
+
+namespace:
+  enabled: true
+  mount: true
+  network: true   # 禁止网络
+  ipc: true
+
+cgroup:
+  enabled: true
+  max_processes: 64  # 编译器可能 fork 多个进程
+
+sandbox:
+  mode: pivot_root
+  readonly:
+    - /usr
+    - /lib
+    - /lib64
+    - /etc/ld.so.cache
+    - /etc/ld.so.conf
+    - /etc/ld.so.conf.d
+    - /etc/alternatives
+    - /bin
+    - /usr/bin
+    - /usr/lib
+    - /usr/include
+    - /usr/share
+  writable: []
+  tmpfs:
+    /tmp: 256m
+    /dev: 4m
+  devices:
+    - /dev/null
+    - /dev/urandom
+    - /dev/zero

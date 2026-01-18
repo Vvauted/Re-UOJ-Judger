@@ -1,0 +1,34 @@
+# C++26 语言配置
+language:
+  id: "C++26"
+  display_name: "C++ 26"
+  description: "GNU C++ Compiler with C++26 standard (experimental)"
+  version: "C++26"
+  
+  extensions: [".cpp", ".cc", ".cxx"]
+  needs_compile: true
+  
+  check_illegal_keywords: true
+  illegal_keywords: ["__asm", "__asm__", "asm"]
+
+compiler:
+  command: "/usr/bin/g++"
+  args: ["-o", "{output}", "-x", "c++", "{source}", "-lm", "-O2", "-DONLINE_JUDGE", "-std=c++2c"]
+  time_limit: 15
+  memory_limit: 512
+  sandbox_type: "compiler"
+
+runtime:
+  sandbox_type: "default"
+  time_multiplier: 1.0
+  memory_multiplier: 1.0
+  base_memory: 0
+
+syscall:
+  runtime: {}
+  compiler: {}
+
+env:
+  compile: {}
+  runtime: {}
+

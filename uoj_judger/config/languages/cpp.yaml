@@ -1,0 +1,38 @@
+# C++ 语言配置
+language:
+  id: "C++"
+  display_name: "C++"
+  description: "GNU C++ Compiler"
+  
+  extensions: [".cpp", ".cc", ".cxx"]
+  needs_compile: true
+  
+  # 安全检查
+  check_illegal_keywords: true
+  illegal_keywords: ["__asm", "__asm__", "asm"]
+
+# 编译配置
+compiler:
+  command: "/usr/bin/g++"
+  args: ["-o", "{output}", "-x", "c++", "{source}", "-lm", "-O2", "-DONLINE_JUDGE"]
+  time_limit: 15
+  memory_limit: 512
+  sandbox_type: "compiler"
+
+# 运行配置  
+runtime:
+  # 编译型语言，直接运行可执行文件
+  # executable 为空时使用 {name}
+  sandbox_type: "default"
+  time_multiplier: 1.0
+  memory_multiplier: 1.0
+  base_memory: 0
+
+# Syscall 策略（使用基础策略）
+syscall:
+  runtime: {}
+  compiler: {}
+
+env:
+  compile: {}
+  runtime: {}

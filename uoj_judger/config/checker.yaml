@@ -1,0 +1,120 @@
+# Checker 安全配置
+# Checker 可能是用户上传的自定义程序，需要安全限制
+
+security:
+  use_seccomp: true
+  use_landlock: false    # Checker 需要读取多个文件，配置复杂
+  use_namespace: false
+  use_ptrace: false
+  use_cgroup: true
+
+# 资源限制
+limits:
+  time_limit: 15         # 秒
+  memory_limit: 1024     # MB
+  output_limit: 64       # MB
+  max_processes: 1
+  stack_limit_mb: 8
+
+# 允许的系统调用（基础集，与 C++ 类似）
+syscall:
+  allow:
+    # 基础 I/O
+    - read
+    - write
+    - open
+    - close
+    - openat
+    - fstat
+    - stat
+    - lstat
+    - access
+    - lseek
+    - pread64
+    - readv
+    - writev
+    
+    # 内存管理
+    - mmap
+    - mprotect
+    - munmap
+    - brk
+    - mremap
+    
+    # 进程控制
+    - exit
+    - exit_group
+    - getpid
+    - gettid
+    - getuid
+    - geteuid
+    - getgid
+    - getegid
+    
+    # 信号
+    - rt_sigaction
+    - rt_sigprocmask
+    - rt_sigreturn
+    - sigaltstack
+    
+    # 时间
+    - clock_gettime
+    - clock_getres
+    - gettimeofday
+    - nanosleep
+    
+    # 系统信息
+    - uname
+    - sysinfo
+    - getrandom
+    - prlimit64
+    - getrlimit
+    
+    # 文件描述符操作
+    - dup
+    - dup2
+    - dup3
+    - fcntl
+    - ioctl
+    
+    # 目录操作
+    - getcwd
+    - getdents
+    - getdents64
+    
+    # 线程同步
+    - futex
+    - set_tid_address
+    - set_robust_list
+    
+    # 架构相关
+    - arch_prctl
+    
+    # 文件属性
+    - newfstatat
+    - fstatfs
+    - statfs
+    - readlink
+    - readlinkat
+
+  # 禁止的操作
+  deny:
+    - execve      # 禁止执行其他程序
+    - fork        # 禁止 fork
+    - clone       # 禁止创建子进程
+    - clone3
+    - vfork
+    - socket      # 禁止网络
+    - connect
+    - bind
+    - listen
+    - accept
+    - ptrace      # 禁止调试
+    - kill        # 禁止发送信号给其他进程
+    - tkill
+    - tgkill
+
+# 可访问路径（由 runner 动态设置）
+# readable_paths: 由运行时根据实际文件位置设置
+# writable_paths: 通常不需要写权限
+

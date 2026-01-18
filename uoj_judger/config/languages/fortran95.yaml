@@ -1,0 +1,31 @@
+# Fortran 95 语言配置
+language:
+  id: "Fortran95"
+  display_name: "Fortran 95"
+  description: "GNU Fortran Compiler with Fortran 95 standard"
+  version: "Fortran95"
+  
+  extensions: [".f", ".f90", ".f95", ".for"]
+  needs_compile: true
+
+compiler:
+  command: "/usr/bin/gfortran"
+  args: ["-o", "{output}", "{source}", "-O2", "-std=f95"]
+  time_limit: 15
+  memory_limit: 512
+  sandbox_type: "compiler"
+
+runtime:
+  sandbox_type: "default"
+  time_multiplier: 1.0
+  memory_multiplier: 1.0
+  base_memory: 0
+
+syscall:
+  runtime: {}
+  compiler: {}
+
+env:
+  compile: {}
+  runtime: {}
+

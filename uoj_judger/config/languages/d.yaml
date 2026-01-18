@@ -1,0 +1,31 @@
+# D 语言配置
+language:
+  id: "D"
+  display_name: "D"
+  description: "D Programming Language (DMD/LDC)"
+  version: "D"
+  
+  extensions: [".d"]
+  needs_compile: true
+
+compiler:
+  command: "/usr/bin/ldc2"
+  args: ["-of={output}", "{source}", "-O2", "-release"]
+  time_limit: 30
+  memory_limit: 1024
+  sandbox_type: "compiler"
+
+runtime:
+  sandbox_type: "default"
+  time_multiplier: 1.0
+  memory_multiplier: 1.0
+  base_memory: 0
+
+syscall:
+  runtime: {}
+  compiler: {}
+
+env:
+  compile: {}
+  runtime: {}
+

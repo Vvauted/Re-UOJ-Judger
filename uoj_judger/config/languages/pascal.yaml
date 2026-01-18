@@ -1,0 +1,29 @@
+# Pascal 语言配置
+language:
+  id: "Pascal"
+  display_name: "Pascal"
+  description: "Free Pascal Compiler"
+  
+  extensions: [".pas"]
+  needs_compile: true
+
+compiler:
+  command: "/usr/bin/fpc"
+  args: ["{source}", "-O2"]
+  time_limit: 15
+  memory_limit: 512
+  sandbox_type: "compiler"
+
+runtime:
+  sandbox_type: "default"
+  time_multiplier: 1.0
+  memory_multiplier: 1.0
+  base_memory: 0
+
+syscall:
+  runtime: {}
+  compiler: {}
+
+env:
+  compile: {}
+  runtime: {}

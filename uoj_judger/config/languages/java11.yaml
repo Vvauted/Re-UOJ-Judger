@@ -1,0 +1,122 @@
+# Java 11 语言配置
+language:
+  id: "Java11"
+  display_name: "Java 11"
+  description: "OpenJDK 11"
+  version: "11"
+  
+  extensions: [".java"]
+  needs_compile: true
+  needs_main_class: true
+  default_main_class: "Main"
+
+compiler:
+  command: "/usr/lib/jvm/java-11-openjdk-amd64/bin/javac"
+  args: ["-encoding", "UTF-8", "-J-Xmx512m", "{main_class}.java"]
+  time_limit: 30
+  memory_limit: 2048
+  sandbox_type: "compiler"
+
+runtime:
+  command: "/usr/lib/jvm/java-11-openjdk-amd64/bin/java"
+  # 保持与原 UOJ 一致的 JVM 参数
+  # -Xmx1024m: 最大堆 1GB
+  # -Xss1024m: 每线程栈 1GB（支持深递归）
+  args: ["-Xmx1024m", "-Xss1024m", "{main_class}"]
+  sandbox_type: "java11"
+  
+  time_multiplier: 2.0
+  memory_multiplier: 2.0
+  base_memory: 256
+  max_processes: 0  # 不限制进程数（与原 UOJ 一致）
+
+syscall:
+  runtime:
+    allow:
+      # 基础 I/O
+      - read: -1
+      - write: -1
+      - open: -1
+      - close: -1
+      - openat: -1
+      - fstat: -1
+      - stat: -1
+      - lstat: -1
+      - pread64: -1
+      - lseek: -1
+      - access: -1
+      - readlink: -1
+      - getcwd: -1
+      - fcntl: -1
+      - ioctl: -1
+      - ftruncate: -1
+      - flock: -1
+      - unlink: -1
+      - mkdir: -1
+      - fchdir: -1
+      # 内存
+      - brk: -1
+      - mmap: -1
+      - munmap: -1
+      - mprotect: -1
+      - madvise: -1
+      # 线程/进程
+      - gettid: -1
+      - set_tid_address: -1
+      - set_robust_list: -1
+      - futex: -1
+      - clone: -1
+      - clone3: -1
+      - getpid: -1
+      - getuid: -1
+      - geteuid: -1
+      # 信号
+      - rt_sigaction: -1
+      - rt_sigprocmask: -1
+      - rt_sigreturn: -1
+      - sigaltstack: -1
+      # 系统信息
+      - uname: -1
+      - getdents: -1
+      - getdents64: -1
+      - clock_getres: -1
+      - sched_getaffinity: -1
+      - sched_yield: -1
+      - prlimit64: -1
+      - sysinfo: -1
+      - prctl: -1
+      - getrusage: -1
+      - arch_prctl: -1
+      # 时间
+      - nanosleep: -1
+      - clock_nanosleep: -1
+      - clock_gettime: -1
+      - gettimeofday: -1
+      # 网络（软禁止）
+      - socket: -1
+      - connect: -1
+      # 退出
+      - exit: -1
+      - exit_group: -1
+      - execve: -1
+    readable_paths:
+      - "/usr/lib/jvm/java-11-openjdk-amd64/"
+      - "/sys/devices/system/cpu/"
+      - "/proc/"
+      - "/sys/fs/cgroup/"
+      - "/usr/share/java/"
+      - "/usr/lib/locale/"
+    allow_clone: true
+    
+    # Java 需要访问 /proc, /sys
+    use_landlock: false
+    use_ptrace: false
+    # Java 需要大栈空间（-Xss1024m = 1GB）和大量虚拟地址空间
+    stack_limit_mb: 1024
+    disable_address_limit: true
+
+env:
+  compile:
+    JAVA_HOME: "/usr/lib/jvm/java-11-openjdk-amd64"
+  runtime:
+    JAVA_HOME: "/usr/lib/jvm/java-11-openjdk-amd64"
