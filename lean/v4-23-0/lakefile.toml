@@ -18,13 +18,9 @@ name = "auto"
 scope = "leanprover-community"
 rev = "2c088e7617d6e2018386de23b5df3b127fae4634"
 
-# 用户代码入口
+[[lean_lib]]
+name = "Answer"
+
 [[lean_exe]]
 name = "answer"
 root = "Answer"
-
-[[lean_exe]]
-name = "lake-build-offline"
-root = "LakeBuildOffline"
-supportInterpreter = true
-

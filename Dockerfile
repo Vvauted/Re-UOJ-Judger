@@ -39,43 +39,9 @@ WORKDIR /usr/lean/v4-23-0
 
 RUN echo "leanprover/lean4:v4.23.0" > lean-toolchain
 
-RUN cat > lakefile.toml << 'EOF'
-name = "v4-23-0"
-packagesDir = "/usr/lean/v4-23-0/.lake/packages"
-version = "0.1.0"
-defaultTargets = ["answer"]
-
-[[require]]
-name = "mathlib"
-scope = "leanprover-community"
-rev = "v4.23.0"
-
-[[require]]
-name = "Loom"
-git = "https://github.com/verse-lab/loom"
-rev = "v4.23.0"
-
-[[require]]
-name = "auto"
-scope = "leanprover-community"
-rev = "2c088e7617d6e2018386de23b5df3b127fae4634"
-
-[[lean_lib]]
-name = "Answer"
-
-[[lean_exe]]
-name = "answer"
-root = "Answer"
-
-EOF
-
-RUN cat > Answer.lean << 'EOF'
-import Mathlib
-import Loom
-import Auto.Tactic
-
-def main : IO Unit := pure ()
-EOF
+# 复制 Lean 项目文件
+COPY lean/v4-23-0/lakefile.toml /usr/lean/v4-23-0/
+COPY lean/v4-23-0/Answer.lean /usr/lean/v4-23-0/
 
 # 下载依赖并构建
 RUN lake exe cache get
