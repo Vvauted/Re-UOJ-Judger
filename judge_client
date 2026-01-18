@@ -256,7 +256,15 @@ def judge():
 	submission_judged = False
 	report_thread.start()
 	
-	execute(pipes.quote(uoj_judger_path('/main_judger')))
+	# 尝试使用 systemd-run 获取 cgroup 委托，避免与 systemd 竞态
+	# 如果 systemd 不可用（如 Docker 容器），则直接执行
+	main_judger = pipes.quote(uoj_judger_path('/main_judger'))
+	if os.path.exists('/run/systemd/system'):
+		# systemd 可用，使用 scope 获取 cgroup 委托
+		execute('systemd-run --scope --property=Delegate=yes --quiet ' + main_judger)
+	else:
+		# Docker 容器或无 systemd 环境，直接执行
+		execute(main_judger)
 	
 	submission_judged = True
 	report_thread.join()
