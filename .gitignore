@@ -1,22 +1,49 @@
 # 编译产物
 *.o
 *.a
-main_judger
-uoj_judger/builtin/checker/[a-z]*[^.cpp]
+*.so
+*.class
+uoj_judger/main_judger
 uoj_judger/builtin/judger/judger
+uoj_judger/builtin/judger/judger_modern
+uoj_judger/builtin/checker/acmp
+uoj_judger/builtin/checker/bcmp
+uoj_judger/builtin/checker/caseicmp
+uoj_judger/builtin/checker/casencmp
+uoj_judger/builtin/checker/casewcmp
+uoj_judger/builtin/checker/dcmp
+uoj_judger/builtin/checker/fcmp
+uoj_judger/builtin/checker/hcmp
+uoj_judger/builtin/checker/icmp
+uoj_judger/builtin/checker/lcmp
+uoj_judger/builtin/checker/ncmp
+uoj_judger/builtin/checker/rcmp
+uoj_judger/builtin/checker/rcmp4
+uoj_judger/builtin/checker/rcmp6
+uoj_judger/builtin/checker/rcmp9
+uoj_judger/builtin/checker/rncmp
+uoj_judger/builtin/checker/uncmp
+uoj_judger/builtin/checker/wcmp
+uoj_judger/builtin/checker/yesno
+uoj_judger/run/formatter
+uoj_judger/run/run_interaction
+uoj_judger/run/run_program
 
-# 工作目录
-uoj_judger/data/
+# 临时/测试文件
 uoj_judger/work/
 uoj_judger/result/
+uoj_judger/data
 
 # 日志
 *.log
-log/
+*.tmp
+*~
+.*.swp
 
 # IDE
 .vscode/
 .idea/
 
-# Docker 数据
-*.tar
+# 系统文件
+.DS_Store
+Thumbs.db

@@ -6,31 +6,41 @@ services:
     
     # 必需的 Linux capabilities（用于沙箱）
     cap_add:
-      - SYS_ADMIN      # mount namespace, pivot_root
+      - SYS_ADMIN      # mount namespace, pivot_root, cgroup
       - SYS_PTRACE     # ptrace (备用)
       - NET_ADMIN      # network namespace
       - MKNOD          # 创建设备节点
+      - SYS_RESOURCE   # setrlimit
     
     # 安全选项
     security_opt:
       - seccomp:unconfined   # 允许 seccomp-bpf
       - apparmor:unconfined  # 禁用 apparmor
     
+    # cgroup namespace 隔离（私有模式）
+    # 容器获得独立的 cgroup 视图，只能操作自己的子树
+    # 不会和宿主机 systemd 产生竞态条件
+    cgroup: private
+    
     environment:
       - JUDGER_NAME=compose_judger
       - JUDGER_PASSWORD=_judger_password_
       - UOJ_HOST=http://uoj-web
     
-    # 使用 privileged 模式获得完整 cgroup 控制
-    privileged: true
+    # tmpfs 用于隔离
+    tmpfs:
+      - /tmp:exec,size=512M
+      - /run:exec,size=64M
+      # 注意：不挂载 /sys/fs/cgroup 作为 tmpfs
+      # 启动脚本会用 mount -t cgroup2 挂载
+      # 使用 cgroup: private 时，挂载的是容器自己的 cgroup 子树
     
     volumes:
-      # 配置文件（可外部修改）
+      # 配置文件（只读）
       - ./uoj_judger/config/users:/config:ro
-      # 题目数据（使用 UOJ 的数据目录）
+      # 题目数据
       - /root/oj/UOJ-System/uoj_data/web/data:/var/uoj_data_copy:rw
-      # cgroup v2 (可写)
-      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+      # 不再挂载宿主机的 /sys/fs/cgroup
     
     networks:
       - uoj-network

@@ -4,11 +4,22 @@
  * 
  * 使用 cgroups v2 进行资源限制，比 ptrace 检查更高效。
  * 
- * 支持的限制：
- * - 内存限制 (memory.max, memory.swap.max)
- * - CPU 限制 (cpu.max)
- * - 进程数限制 (pids.max)
- * - I/O 带宽限制 (io.max)
+ * 架构设计（遵循 cgroup v2 "no internal processes" 规则）：
+ * 
+ * 当通过 systemd-run --scope --property=Delegate=yes 启动时：
+ *   /sys/fs/cgroup/system.slice/run-XXXXX.scope/  （被委派）
+ *   ├── judger/          ← main_judger 进程移动到这里
+ *   └── sandbox/         ← 沙箱 cgroup 池
+ *       ├── box_0/
+ *       ├── box_1/
+ *       └── ...
+ * 
+ * 当在 Docker 容器中运行时：
+ *   /sys/fs/cgroup/      （容器内的根）
+ *   ├── judger/          ← main_judger 进程
+ *   └── sandbox/         ← 沙箱 cgroup 池
+ *       ├── box_0/
+ *       └── ...
  */
 
 #ifndef UOJ_SANDBOX_CGROUP_H
@@ -23,6 +34,8 @@
 #include <mutex>
 #include <unistd.h>
 #include <sys/stat.h>
+#include <sys/vfs.h>
+#include <linux/magic.h>
 
 #include "core/error.h"
 
@@ -104,6 +117,31 @@ struct CgroupLimits {
 };
 
 /**
+ * @brief 获取当前进程的 cgroup 路径
+ * 
+ * 读取 /proc/self/cgroup 来确定当前进程所在的 cgroup。
+ * 在 cgroup v2 中，格式为 "0::/path/to/cgroup"
+ * 
+ * @return cgroup 路径（相对于 /sys/fs/cgroup）
+ */
+inline std::string get_self_cgroup_path() {
+    std::ifstream cgroup_file("/proc/self/cgroup");
+    if (!cgroup_file) {
+        return "";
+    }
+    
+    std::string line;
+    while (std::getline(cgroup_file, line)) {
+        // cgroup v2 格式: "0::/path"
+        if (line.substr(0, 3) == "0::") {
+            return line.substr(3);
+        }
+    }
+    
+    return "";
+}
+
+/**
  * @brief cgroup v2 控制器
  */
 class CgroupController {
@@ -112,8 +150,6 @@ private:
     std::string name_;
     bool created_;
     bool auto_cleanup_;
-
-    static constexpr const char* CGROUP_ROOT = "/sys/fs/cgroup";
 
     /**
      * @brief 写入 cgroup 控制文件
@@ -190,12 +226,12 @@ public:
     /**
      * @brief 构造函数
      * @param name cgroup 名称
-     * @param parent 父 cgroup 路径（相对于 /sys/fs/cgroup）
+     * @param parent_path 父 cgroup 的完整路径（绝对路径）
      */
     explicit CgroupController(const std::string &name, 
-                              const std::string &parent = "uoj")
+                              const std::string &parent_path)
         : name_(name), created_(false), auto_cleanup_(true) {
-        cgroup_path_ = std::string(CGROUP_ROOT) + "/" + parent + "/" + name;
+        cgroup_path_ = parent_path + "/" + name;
     }
 
     ~CgroupController() {
@@ -379,9 +415,6 @@ public:
             usleep(1000);  // 1ms
         }
         
-        // 3. 重置内存峰值统计 (cgroup v2 不支持直接重置，需要重新创建)
-        // 但我们可以记录当前值作为基准
-        
         return Ok();
     }
     
@@ -398,38 +431,177 @@ public:
 
 /**
  * @brief 检查 cgroups v2 是否可用
+ * 
+ * 使用 statfs 检测文件系统类型（nsjail 做法），比检查文件存在更健壮。
  */
 inline bool is_cgroup_v2_available() {
-    // 检查 cgroup2 是否挂载
-    return fs::exists("/sys/fs/cgroup/cgroup.controllers");
+    struct statfs buf;
+    if (statfs("/sys/fs/cgroup", &buf) != 0) {
+        return false;
+    }
+    // CGROUP2_SUPER_MAGIC = 0x63677270
+    return buf.f_type == CGROUP2_SUPER_MAGIC;
 }
 
 /**
- * @brief 创建评测机专用 cgroup
+ * @brief cgroup 管理器
+ * 
+ * 负责管理 cgroup 层级结构，遵循 cgroup v2 "no internal processes" 规则。
+ * 
+ * 结构：
+ *   <base_path>/           ← 被委派的 cgroup（来自 systemd-run）或容器根
+ *   ├── judger/            ← main_judger 进程移动到这里
+ *   └── sandbox/           ← 沙箱 cgroup 池的父目录
+ *       ├── box_0/
+ *       ├── box_1/
+ *       └── ...
  */
-inline Result<CgroupController> create_judge_cgroup(
-    const std::string &name,
-    uint64_t memory_mb,
-    uint64_t max_pids = 1
-) {
-    CgroupController cg(name);
+class CgroupManager {
+private:
+    std::string base_path_;           ///< 基础 cgroup 路径（绝对路径）
+    std::string sandbox_parent_;      ///< 沙箱 cgroup 的父路径
+    bool initialized_;
+    std::mutex mutex_;
     
-    UOJ_TRY(cg.create());
+    static constexpr const char* CGROUP_ROOT = "/sys/fs/cgroup";
     
-    CgroupLimits limits;
-    limits.set_memory(memory_mb)
-          .disable_swap()
-          .set_max_pids(max_pids);
+    CgroupManager() : initialized_(false) {}
     
-    UOJ_TRY(cg.apply_limits(limits));
+    /**
+     * @brief 启用子 cgroup 的控制器
+     */
+    bool enable_controllers(const std::string& path) {
+        std::ofstream subtree(path + "/cgroup.subtree_control");
+        if (subtree) {
+            subtree << "+memory +cpu +pids +io";
+            return subtree.good();
+        }
+        return false;
+    }
     
-    return Ok(std::move(cg));
-}
+    /**
+     * @brief 创建目录
+     */
+    bool create_dir(const std::string& path) {
+        if (fs::exists(path)) return true;
+        return mkdir(path.c_str(), 0755) == 0;
+    }
+    
+    /**
+     * @brief 移动进程到指定 cgroup
+     */
+    bool move_process(const std::string& cgroup_path, pid_t pid) {
+        std::ofstream procs(cgroup_path + "/cgroup.procs");
+        if (procs) {
+            procs << pid;
+            return procs.good();
+        }
+        return false;
+    }
+
+public:
+    static CgroupManager& instance() {
+        static CgroupManager mgr;
+        return mgr;
+    }
+    
+    /**
+     * @brief 初始化 cgroup 管理器
+     * 
+     * 检测当前进程的 cgroup，设置正确的层级结构，
+     * 并将当前进程移动到 judger/ 子 cgroup。
+     * 
+     * @return 是否初始化成功
+     */
+    Result<void> initialize() {
+        std::lock_guard<std::mutex> lock(mutex_);
+        
+        if (initialized_) {
+            return Ok();
+        }
+        
+        // 1. 获取当前进程的 cgroup 路径
+        std::string self_cgroup = get_self_cgroup_path();
+        
+        if (self_cgroup.empty() || self_cgroup == "/") {
+            // 在根 cgroup 中（可能是 Docker 容器或无 systemd）
+            base_path_ = CGROUP_ROOT;
+        } else {
+            // 在某个子 cgroup 中（可能是 systemd-run 创建的 scope）
+            base_path_ = std::string(CGROUP_ROOT) + self_cgroup;
+        }
+        
+        // 2. 验证 base_path 存在
+        if (!fs::exists(base_path_)) {
+            return Err<void>(ErrorCode::FILE_READ_ERROR,
+                           "Base cgroup path does not exist: " + base_path_);
+        }
+        
+        // ===== 遵循 cgroup v2 "no internal processes" 规则 =====
+        // 必须先移动进程，然后才能启用 subtree_control
+        // 否则会收到 EBUSY 错误
+        
+        // 3. 创建 judger/ 子 cgroup（不需要先启用控制器）
+        std::string judger_path = base_path_ + "/judger";
+        if (!create_dir(judger_path)) {
+            return Err<void>(ErrorCode::FILE_WRITE_ERROR,
+                           "Cannot create judger cgroup: " + judger_path);
+        }
+        
+        // 4. 立即将当前进程移动到 judger/（腾出 base_path_）
+        //    这是遵循 "no internal processes" 规则的关键步骤！
+        if (!move_process(judger_path, getpid())) {
+            return Err<void>(ErrorCode::FILE_WRITE_ERROR,
+                           "Cannot move self to judger cgroup");
+        }
+        
+        // 5. 现在 base_path_ 没有进程了，可以安全地启用控制器
+        enable_controllers(base_path_);
+        
+        // 6. 创建 sandbox/ 子 cgroup（用于沙箱进程）
+        sandbox_parent_ = base_path_ + "/sandbox";
+        if (!create_dir(sandbox_parent_)) {
+            return Err<void>(ErrorCode::FILE_WRITE_ERROR,
+                           "Cannot create sandbox cgroup: " + sandbox_parent_);
+        }
+        
+        // 7. 启用 sandbox 的子控制器
+        enable_controllers(sandbox_parent_);
+        
+        initialized_ = true;
+        return Ok();
+    }
+    
+    /**
+     * @brief 获取沙箱 cgroup 的父路径
+     */
+    const std::string& sandbox_parent_path() const {
+        return sandbox_parent_;
+    }
+    
+    /**
+     * @brief 获取基础路径
+     */
+    const std::string& base_path() const {
+        return base_path_;
+    }
+    
+    /**
+     * @brief 是否已初始化
+     */
+    bool is_initialized() const {
+        return initialized_;
+    }
+};
 
 /**
  * @brief cgroup 池 - 复用 cgroup 减少创建/销毁开销
  * 
  * 使用方法：
+ *   // 先初始化管理器
+ *   CgroupManager::instance().initialize();
+ *   
+ *   // 然后使用池
  *   auto& pool = CgroupPool::instance();
  *   auto cg = pool.acquire(memory_mb, max_pids);
  *   // 使用 cg...
@@ -455,6 +627,15 @@ public:
     std::unique_ptr<CgroupController> acquire(uint64_t memory_mb, uint64_t max_pids = 64) {
         std::lock_guard<std::mutex> lock(mutex_);
         
+        // 确保 CgroupManager 已初始化
+        auto& mgr = CgroupManager::instance();
+        if (!mgr.is_initialized()) {
+            auto result = mgr.initialize();
+            if (!result.ok()) {
+                return nullptr;
+            }
+        }
+        
         // 尝试从池中获取
         if (!pool_.empty()) {
             auto cg = std::move(pool_.back());
@@ -469,9 +650,9 @@ public:
             return cg;
         }
         
-        // 创建新的
-        std::string name = "sandbox_" + std::to_string(getpid()) + "_" + std::to_string(next_id_++);
-        auto cg = std::make_unique<CgroupController>(name);
+        // 创建新的（在 sandbox/ 下）
+        std::string name = "box_" + std::to_string(getpid()) + "_" + std::to_string(next_id_++);
+        auto cg = std::make_unique<CgroupController>(name, mgr.sandbox_parent_path());
         cg->set_auto_cleanup(false);  // 池管理生命周期
         
         if (cg->create().ok()) {
@@ -518,8 +699,35 @@ public:
     }
 };
 
+/**
+ * @brief 创建评测机专用 cgroup（便捷函数）
+ */
+inline Result<CgroupController> create_judge_cgroup(
+    const std::string &name,
+    uint64_t memory_mb,
+    uint64_t max_pids = 1
+) {
+    // 确保管理器已初始化
+    auto& mgr = CgroupManager::instance();
+    if (!mgr.is_initialized()) {
+        UOJ_TRY(mgr.initialize());
+    }
+    
+    CgroupController cg(name, mgr.sandbox_parent_path());
+    
+    UOJ_TRY(cg.create());
+    
+    CgroupLimits limits;
+    limits.set_memory(memory_mb)
+          .disable_swap()
+          .set_max_pids(max_pids);
+    
+    UOJ_TRY(cg.apply_limits(limits));
+    
+    return Ok(std::move(cg));
+}
+
 } // namespace sandbox
 } // namespace uoj
 
 #endif // UOJ_SANDBOX_CGROUP_H
-

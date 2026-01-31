@@ -1,6 +1,6 @@
 # UOJ New Judger
 
-> 警告：本项目目前处于测试与代码审查阶段，**不建议将本项目的实现投入使用！**
+> 本项目目前处于测试阶段
 
 基于现代 Linux 安全特性的 UOJ 评测机，使用 seccomp-bpf + cgroups v2 + namespaces 替代传统 ptrace 沙箱。
 

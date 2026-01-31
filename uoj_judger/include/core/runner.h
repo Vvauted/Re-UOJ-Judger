@@ -50,12 +50,44 @@ public:
 
     /**
      * @brief 运行提交的程序
+     * 
+     * 重要：所有路径必须使用 realpath 解析，因为 pivot_root 后符号链接可能失效。
      */
     RunResult run_submission(
             const std::string &input_file_name,
             const std::string &output_file_name,
             const RunLimit &limit,
             const std::string &name) {
+        
+        // 解析所有路径为真实路径
+        std::string real_work = get_realpath(work_path_);
+        std::string real_data = get_realpath(data_path_);
+        std::string real_main = get_realpath(main_path_);
+        std::string real_input = get_realpath(input_file_name);
+        // 注意：output_file_name 可能还不存在，不能用 realpath
+        std::string real_output = real_work + "/" + 
+            (output_file_name.find('/') != std::string::npos 
+                ? output_file_name.substr(output_file_name.rfind('/') + 1)
+                : output_file_name);
+        if (output_file_name[0] == '/') {
+            // 绝对路径
+            char* rp = realpath(output_file_name.c_str(), nullptr);
+            if (rp) {
+                real_output = rp;
+                free(rp);
+            } else {
+                // 文件不存在，计算其目录的 realpath
+                std::string dir = output_file_name.substr(0, output_file_name.rfind('/'));
+                std::string base = output_file_name.substr(output_file_name.rfind('/') + 1);
+                char* dir_rp = realpath(dir.c_str(), nullptr);
+                if (dir_rp) {
+                    real_output = std::string(dir_rp) + "/" + base;
+                    free(dir_rp);
+                } else {
+                    real_output = output_file_name;
+                }
+            }
+        }
         
         // 获取语言配置
         std::string lang = config_->get_str(name + "_language");
@@ -66,17 +98,23 @@ public:
         std::vector<std::string> run_args;
         
         if (plugin) {
-            RunContext ctx{work_path_, name, config_};
+            RunContext ctx{real_work, name, config_};
             run_args = plugin->get_run_args(ctx);
             
             if (!run_args.empty()) {
                 program = run_args[0];
                 run_args.erase(run_args.begin());
             } else {
-                program = work_path_ + "/" + name;
+                program = real_work + "/" + name;
             }
         } else {
-            program = work_path_ + "/" + name;
+            program = real_work + "/" + name;
+        }
+        
+        // 解析程序路径
+        std::string real_program = get_realpath(program);
+        if (real_program.empty()) {
+            real_program = program;  // fallback
         }
         
         // 替换 {memory} 占位符
@@ -89,7 +127,7 @@ public:
         }
         
         // 加载 User 配置
-        UserPtr submission_user = User::load(main_path_ + "/config/users/submission.yml");
+        UserPtr submission_user = User::load(real_main + "/config/users/submission.yml");
         if (!submission_user) {
             submission_user = User::submission();
         }
@@ -98,9 +136,9 @@ public:
         sandbox::SandboxConfig config = sandbox::SandboxConfig::from_user(submission_user->config());
         
         // 设置程序
-        config.program = program;
+        config.program = real_program;
         config.args = run_args;
-        config.work_dir = work_path_;
+        config.work_dir = real_work;
         
         // 应用语言特定的倍率
         double time_mult = plugin ? plugin->time_multiplier() : 1.0;
@@ -111,10 +149,10 @@ public:
         config.memory_limit_kb = static_cast<int>((limit.memory * mem_mult + base_mem) * 1024);
         config.output_limit_kb = limit.output * 1024;
         
-        // I/O 重定向
-        config.stdin_file = input_file_name;
-        config.stdout_file = output_file_name;
-        config.stderr_file = work_path_ + "/stderr.txt";  // DEBUG: 临时改为文件
+        // I/O 重定向（使用真实路径）
+        config.stdin_file = real_input;
+        config.stdout_file = real_output;
+        config.stderr_file = real_work + "/stderr.txt";
         
         // 启用 cgroup
         config.use_cgroup = sandbox::is_cgroup_v2_available();
@@ -129,14 +167,16 @@ public:
             }
             config.disable_address_limit = policy.disable_address_limit;
             
-            // 只读路径（添加到 sandbox.readonly）
+            // 只读路径（添加到 sandbox.readonly，使用 realpath）
             for (const auto& path : policy.readable_paths) {
-                config.sandbox.readonly.push_back(path);
+                std::string rp = get_realpath(path);
+                config.sandbox.readonly.push_back(rp.empty() ? path : rp);
             }
             
-            // 可写路径（添加到 sandbox.writable）
+            // 可写路径（添加到 sandbox.writable，使用 realpath）
             for (const auto& path : policy.writable_paths) {
-                config.sandbox.writable.push_back(path);
+                std::string rp = get_realpath(path);
+                config.sandbox.writable.push_back(rp.empty() ? path : rp);
             }
             
             // 允许的 syscall（合并）
@@ -152,12 +192,12 @@ public:
             }
         }
         
-        // 添加工作目录和数据目录到可读路径
-        config.sandbox.readonly.push_back(work_path_);
-        config.sandbox.readonly.push_back(data_path_);
+        // 添加工作目录和数据目录到可读路径（使用真实路径）
+        config.sandbox.readonly.push_back(real_work);
+        config.sandbox.readonly.push_back(real_data);
         
         // 工作目录可写
-        config.sandbox.writable.push_back(work_path_);
+        config.sandbox.writable.push_back(real_work);
         
         // 执行
         sandbox::Sandbox sandbox(config);
@@ -177,6 +217,9 @@ public:
 
     /**
      * @brief 运行 Checker
+     * 
+     * 重要：所有路径必须使用 realpath 解析，因为 pivot_root 后符号链接可能失效。
+     * 这符合 nsjail 的设计原则：调用者负责提供真实路径。
      */
     RunCheckerResult run_checker(
             const RunLimit &limit,
@@ -185,43 +228,48 @@ public:
             const std::string &output_file_name,
             const std::string &answer_file_name) {
         
+        // 解析所有路径为真实路径（nsjail 做法：调用者负责）
+        std::string real_program = get_realpath(program_name);
+        std::string real_input = get_realpath(input_file_name);
+        std::string real_output = get_realpath(output_file_name);
+        std::string real_answer = get_realpath(answer_file_name);
+        std::string real_work = get_realpath(work_path_);
+        std::string real_result = get_realpath(result_path_);
+        std::string real_data = get_realpath(data_path_);
+        std::string real_main = get_realpath(main_path_);
+        
         // 加载 checker 的 User 配置
-        UserPtr checker_user = User::load(main_path_ + "/config/users/problem.yml");
+        UserPtr checker_user = User::load(real_main + "/config/users/problem.yml");
         if (!checker_user) {
             checker_user = User::problem();
         }
         
         sandbox::SandboxConfig config = sandbox::SandboxConfig::from_user(checker_user->config());
         
-        config.program = program_name;
-        config.args = {
-            get_realpath(input_file_name),
-            get_realpath(output_file_name),
-            get_realpath(answer_file_name)
-        };
-        config.work_dir = work_path_;
+        config.program = real_program;
+        config.args = {real_input, real_output, real_answer};
+        config.work_dir = real_work;
         config.time_limit_ms = limit.time * 1000;
         config.memory_limit_kb = limit.memory * 1024;
         config.output_limit_kb = limit.output * 1024;
         
         config.stdin_file = "/dev/null";
         config.stdout_file = "/dev/null";
-        config.stderr_file = result_path_ + "/checker_error.txt";
+        config.stderr_file = real_result + "/checker_error.txt";
         
-        // 添加可读路径
-        config.sandbox.readonly.push_back(input_file_name);
-        config.sandbox.readonly.push_back(output_file_name);
-        config.sandbox.readonly.push_back(answer_file_name);
-        config.sandbox.readonly.push_back(work_path_);
-        config.sandbox.readonly.push_back(data_path_);
+        // 添加可读路径（使用真实路径）
+        config.sandbox.readonly.push_back(real_input);
+        config.sandbox.readonly.push_back(real_output);
+        config.sandbox.readonly.push_back(real_answer);
+        config.sandbox.readonly.push_back(real_work);
+        config.sandbox.readonly.push_back(real_data);
         
-        // 添加 checker 程序路径（重要！否则 pivot_root 后找不到）
-        config.sandbox.readonly.push_back(program_name);
-        // 也添加整个 builtin 目录以防万一
-        config.sandbox.readonly.push_back(main_path_ + "/builtin");
+        // 添加 checker 程序路径和 builtin 目录
+        config.sandbox.readonly.push_back(real_program);
+        config.sandbox.readonly.push_back(real_main + "/builtin");
         
         // 可写（用于输出）
-        config.sandbox.writable.push_back(result_path_);
+        config.sandbox.writable.push_back(real_result);
         
         config.use_cgroup = sandbox::is_cgroup_v2_available();
         
@@ -240,42 +288,53 @@ public:
             rres.type = RS_AC;
         }
         
-        return RunCheckerResult::from_file(result_path_ + "/checker_error.txt", rres);
+        return RunCheckerResult::from_file(real_result + "/checker_error.txt", rres);
     }
 
     /**
      * @brief 运行 Validator
+     * 
+     * 重要：所有路径必须使用 realpath 解析，因为 pivot_root 后符号链接可能失效。
      */
     RunValidatorResult run_validator(
             const std::string &input_file_name,
             const RunLimit &limit,
             const std::string &program_name) {
         
+        // 解析所有路径为真实路径
+        std::string real_program = get_realpath(program_name);
+        std::string real_input = get_realpath(input_file_name);
+        std::string real_work = get_realpath(work_path_);
+        std::string real_result = get_realpath(result_path_);
+        std::string real_data = get_realpath(data_path_);
+        std::string real_main = get_realpath(main_path_);
+        
         // 加载 validator 的 User 配置
-        UserPtr validator_user = User::load(main_path_ + "/config/users/problem.yml");
+        UserPtr validator_user = User::load(real_main + "/config/users/problem.yml");
         if (!validator_user) {
             validator_user = User::problem();
         }
         
         sandbox::SandboxConfig config = sandbox::SandboxConfig::from_user(validator_user->config());
         
-        config.program = program_name;
-        config.work_dir = work_path_;
+        config.program = real_program;
+        config.work_dir = real_work;
         config.time_limit_ms = limit.time * 1000;
         config.memory_limit_kb = limit.memory * 1024;
         config.output_limit_kb = limit.output * 1024;
         
-        config.stdin_file = input_file_name;
+        config.stdin_file = real_input;
         config.stdout_file = "/dev/null";
-        config.stderr_file = result_path_ + "/validator_error.txt";
+        config.stderr_file = real_result + "/validator_error.txt";
         
-        // 添加可读路径
-        config.sandbox.readonly.push_back(input_file_name);
-        config.sandbox.readonly.push_back(work_path_);
-        config.sandbox.readonly.push_back(data_path_);
+        // 添加可读路径（使用真实路径）
+        config.sandbox.readonly.push_back(real_input);
+        config.sandbox.readonly.push_back(real_work);
+        config.sandbox.readonly.push_back(real_data);
+        config.sandbox.readonly.push_back(real_program);
         
         // 可写
-        config.sandbox.writable.push_back(result_path_);
+        config.sandbox.writable.push_back(real_result);
         
         config.use_cgroup = sandbox::is_cgroup_v2_available();
         
@@ -297,7 +356,7 @@ public:
         
         if (sres.status != sandbox::RunStatus::OK || sres.exit_code != 0) {
             res.succeeded = false;
-            res.info = file_preview(result_path_ + "/validator_error.txt");
+            res.info = file_preview(real_result + "/validator_error.txt");
         } else {
             res.succeeded = true;
         }
@@ -327,6 +386,14 @@ public:
         
         RunSimpleInteractionResult result;
         
+        // 解析所有路径为真实路径（pivot_root 后符号链接可能失效）
+        std::string real_work = get_realpath(work_path_);
+        std::string real_data = get_realpath(data_path_);
+        std::string real_main = get_realpath(main_path_);
+        std::string real_result = get_realpath(result_path_);
+        std::string real_input = get_realpath(input_file_name);
+        std::string real_answer = get_realpath(answer_file_name);
+        
         // 获取用户程序信息
         std::string lang = config_->get_str(name + "_language");
         auto* plugin = LanguageRegistry::instance().get(lang);
@@ -335,7 +402,7 @@ public:
         std::vector<std::string> run_args;
         
         if (plugin) {
-            RunContext ctx{work_path_, name, config_};
+            RunContext ctx{real_work, name, config_};
             program = plugin->get_executable(ctx);
             run_args = plugin->get_run_args(ctx);
             if (!run_args.empty()) {
@@ -343,11 +410,15 @@ public:
                 run_args.erase(run_args.begin());
             }
         } else {
-            program = work_path_ + "/" + name;
+            program = real_work + "/" + name;
         }
         
-        std::string interactor = work_path_ + "/interactor";
-        std::string interactor_err = result_path_ + "/interactor_error.txt";
+        // 解析程序路径
+        std::string real_program = get_realpath(program);
+        if (real_program.empty()) real_program = program;
+        
+        std::string interactor = real_work + "/interactor";
+        std::string interactor_err = real_result + "/interactor_error.txt";
         
         // 创建管道
         int prog_to_inter[2];  // 用户程序 -> 交互器
@@ -360,11 +431,11 @@ public:
             return result;
         }
         
-        // 加载沙箱配置
-        UserPtr submission_user = User::load(main_path_ + "/config/users/submission.yml");
+        // 加载沙箱配置（使用真实路径）
+        UserPtr submission_user = User::load(real_main + "/config/users/submission.yml");
         if (!submission_user) submission_user = User::submission();
         
-        UserPtr problem_user = User::load(main_path_ + "/config/users/problem.yml");
+        UserPtr problem_user = User::load(real_main + "/config/users/problem.yml");
         if (!problem_user) problem_user = User::problem();
         
         // ============================================================
@@ -376,11 +447,11 @@ public:
             close(prog_to_inter[0]);  // 关闭读端
             close(inter_to_prog[1]);  // 关闭写端
             
-            // 构建沙箱配置
+            // 构建沙箱配置（使用真实路径）
             sandbox::SandboxConfig cfg = sandbox::SandboxConfig::from_user(submission_user->config());
-            cfg.program = program;
+            cfg.program = real_program;
             cfg.args = run_args;
-            cfg.work_dir = work_path_;
+            cfg.work_dir = real_work;
             
             // 应用语言特定的倍率
             double time_mult = plugin ? plugin->time_multiplier() : 1.0;
@@ -391,10 +462,10 @@ public:
             cfg.memory_limit_kb = static_cast<int>((limit.memory * mem_mult + base_mem) * 1024);
             cfg.output_limit_kb = limit.output * 1024;
             
-            // 添加必要路径
-            cfg.sandbox.readonly.push_back(work_path_);
-            cfg.sandbox.readonly.push_back(data_path_);
-            cfg.sandbox.writable.push_back(work_path_);
+            // 添加必要路径（使用真实路径）
+            cfg.sandbox.readonly.push_back(real_work);
+            cfg.sandbox.readonly.push_back(real_data);
+            cfg.sandbox.writable.push_back(real_work);
             
             // 设置管道 I/O（使用文件描述符）
             // 使用 /dev/fd/N 形式
@@ -410,7 +481,7 @@ public:
             
             cfg.stdin_file = "";  // 已通过 dup2 重定向
             cfg.stdout_file = "";
-            cfg.stderr_file = work_path_ + "/stderr.txt";
+            cfg.stderr_file = real_work + "/stderr.txt";
             
             // 在 unshare 后手动设置沙箱（不使用 Sandbox 类，因为需要特殊的管道处理）
             if (cfg.use_namespace) {
@@ -455,15 +526,15 @@ public:
                 apply_seccomp_for_interaction(cfg.allowed_syscalls);
             }
             
-            // 执行用户程序
+            // 执行用户程序（使用真实路径）
             std::vector<char*> argv;
-            argv.push_back(const_cast<char*>(program.c_str()));
+            argv.push_back(const_cast<char*>(real_program.c_str()));
             for (auto& arg : run_args) {
                 argv.push_back(const_cast<char*>(arg.c_str()));
             }
             argv.push_back(nullptr);
             
-            execv(program.c_str(), argv.data());
+            execv(real_program.c_str(), argv.data());
             _exit(127);
         }
         
@@ -489,10 +560,10 @@ public:
                 close(err_fd);
             }
             
-            // 构建沙箱配置
+            // 构建沙箱配置（使用真实路径）
             sandbox::SandboxConfig cfg = sandbox::SandboxConfig::from_user(problem_user->config());
-            cfg.program = interactor;
-            cfg.work_dir = work_path_;
+            cfg.program = interactor;  // interactor 已经是真实路径
+            cfg.work_dir = real_work;
             cfg.time_limit_ms = (ilimit.time + limit.time + 2) * 1000;
             cfg.memory_limit_kb = ilimit.memory * 1024;
             
@@ -512,9 +583,9 @@ public:
             rl.rlim_cur = rl.rlim_max = (ilimit.time + limit.time + 2);
             setrlimit(RLIMIT_CPU, &rl);
             
-            // 执行交互器
+            // 执行交互器（使用真实路径）
             execl(interactor.c_str(), interactor.c_str(),
-                  input_file_name.c_str(), "/dev/stdin", answer_file_name.c_str(),
+                  real_input.c_str(), "/dev/stdin", real_answer.c_str(),
                   nullptr);
             _exit(127);
         }

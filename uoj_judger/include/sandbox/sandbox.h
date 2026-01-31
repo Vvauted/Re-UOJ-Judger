@@ -170,8 +170,21 @@ struct SandboxConfig {
     }
     
     // 从 UserConfig 构造
+    // 但 work_dir 自动解析 realpath，因为它是程序运行的关键路径
     static SandboxConfig from_user(const UserConfig &user) {
         SandboxConfig cfg;
+        
+        // 辅助函数：解析真实路径
+        auto resolve_path = [](const std::string& path) -> std::string {
+            if (path.empty()) return path;
+            char* rp = realpath(path.c_str(), nullptr);
+            if (rp) {
+                std::string result(rp);
+                free(rp);
+                return result;
+            }
+            return path;
+        };
         
         // Seccomp
         cfg.use_seccomp = user.use_seccomp;
@@ -193,8 +206,17 @@ struct SandboxConfig {
             cfg.max_processes = 0;
         }
         
-        // 文件系统沙箱
-        cfg.sandbox = user.sandbox;
+        // 文件系统沙箱：解析所有路径的 realpath
+        // 这确保 pivot_root 后符号链接不会失效
+        cfg.sandbox.mode = user.sandbox.mode;
+        for (const auto& path : user.sandbox.readonly) {
+            cfg.sandbox.readonly.push_back(resolve_path(path));
+        }
+        for (const auto& path : user.sandbox.writable) {
+            cfg.sandbox.writable.push_back(resolve_path(path));
+        }
+        cfg.sandbox.tmpfs = user.sandbox.tmpfs;
+        cfg.sandbox.devices = user.sandbox.devices;
         
         // Rlimit
         if (user.rlimit_fsize > 0) {
@@ -209,8 +231,9 @@ struct SandboxConfig {
             cfg.stack_limit_kb = user.rlimit_stack / 1024;
         }
         
-        // 工作目录
-        cfg.work_dir = user.work_dir;
+        // 工作目录：自动解析 realpath
+        // 这是程序运行的关键路径，需要确保正确
+        cfg.work_dir = resolve_path(user.work_dir);
         
         // 环境变量
         for (const auto& kv : user.env) {
@@ -363,10 +386,11 @@ private:
             return false;
         }
         
-        // 3. 辅助函数：bind mount 或创建符号链接
+        // 3. 辅助函数：bind mount（nsjail 风格：简洁实现）
+        // 调用者应确保传入正确路径（from_user 已解析 realpath）
         auto bind_mount = [&newroot](const std::string& src, bool readonly) {
-            struct stat lst;
-            if (lstat(src.c_str(), &lst) != 0) {
+            struct stat st;
+            if (stat(src.c_str(), &st) != 0) {
                 return true;  // 源不存在，跳过
             }
             
@@ -382,26 +406,9 @@ private:
             }
             free(parent);
             
-            // 如果是符号链接，创建相同的符号链接（nsjail 做法）
-            if (S_ISLNK(lst.st_mode)) {
-                char linktarget[PATH_MAX];
-                ssize_t len = readlink(src.c_str(), linktarget, sizeof(linktarget) - 1);
-                if (len > 0) {
-                    linktarget[len] = '\0';
-                    symlink(linktarget, target);
-                }
-                return true;
-            }
-            
-            // 创建挂载点（目录或文件）
-            bool is_dir = S_ISDIR(lst.st_mode);
-            if (is_dir) {
-                int mkret = mkdir(target, 0755);
-                if (mkret != 0 && errno != EEXIST) {
-                    return false;
-                }
-                struct stat mst;
-                if (stat(target, &mst) != 0) {
+            // 创建挂载点
+            if (S_ISDIR(st.st_mode)) {
+                if (mkdir(target, 0755) != 0 && errno != EEXIST) {
                     return false;
                 }
             } else {
@@ -409,6 +416,7 @@ private:
                 if (fd >= 0) close(fd);
             }
             
+            // bind mount
             if (mount(src.c_str(), target, nullptr, MS_BIND | MS_REC, nullptr) != 0) {
                 return false;
             }
@@ -417,6 +425,7 @@ private:
                 mount(nullptr, target, nullptr, 
                       MS_BIND | MS_REMOUNT | MS_RDONLY | MS_NOSUID, nullptr);
             }
+            
             return true;
         };
         
@@ -647,19 +656,30 @@ public:
         
         // 1. 创建 cgroup
         if (config_.use_cgroup && is_cgroup_v2_available()) {
-            cgroup_ = std::make_unique<CgroupController>(cgroup_name_);
-            auto cg_result = cgroup_->create();
-            if (cg_result.is_error()) {
-                LOG_WARN << "Cgroup creation failed, running without cgroup";
-                cgroup_.reset();
-            } else {
-                CgroupLimits limits;
-                limits.set_memory(config_.memory_limit_kb / 1024 + 16)
-                      .disable_swap();
-                if (config_.max_processes > 0) {
-                    limits.set_max_pids(config_.max_processes + 2);
+            // 确保 CgroupManager 已初始化
+            auto& cgmgr = CgroupManager::instance();
+            if (!cgmgr.is_initialized()) {
+                auto init_result = cgmgr.initialize();
+                if (!init_result.ok()) {
+                    LOG_WARN << "CgroupManager init failed, running without cgroup";
                 }
-                cgroup_->apply_limits(limits);
+            }
+            
+            if (cgmgr.is_initialized()) {
+                cgroup_ = std::make_unique<CgroupController>(cgroup_name_, cgmgr.sandbox_parent_path());
+                auto cg_result = cgroup_->create();
+                if (cg_result.is_error()) {
+                    LOG_WARN << "Cgroup creation failed, running without cgroup";
+                    cgroup_.reset();
+                } else {
+                    CgroupLimits limits;
+                    limits.set_memory(config_.memory_limit_kb / 1024 + 16)
+                          .disable_swap();
+                    if (config_.max_processes > 0) {
+                        limits.set_max_pids(config_.max_processes + 2);
+                    }
+                    cgroup_->apply_limits(limits);
+                }
             }
         }
         

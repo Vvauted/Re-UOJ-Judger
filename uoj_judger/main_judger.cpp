@@ -10,10 +10,23 @@
  */
 
 #include "uoj_judger_new.h"
+#include "sandbox/cgroup.h"
 
 using namespace uoj;
 
 int main(int argc, char **argv) {
+    // 初始化 cgroup 管理器
+    // 这会：
+    // 1. 检测当前进程的 cgroup 路径（可能是 systemd-run 创建的 scope）
+    // 2. 创建 judger/ 和 sandbox/ 子 cgroup
+    // 3. 将当前进程移动到 judger/（遵循 cgroup v2 "no internal processes" 规则）
+    auto cgroup_result = sandbox::CgroupManager::instance().initialize();
+    if (!cgroup_result.ok()) {
+        std::cerr << "Warning: Failed to initialize cgroup: " 
+                  << cgroup_result.error().message() << std::endl;
+        // 继续执行，可能在无 cgroup 支持的环境中
+    }
+    
     JudgeContext ctx;
     ctx.init_main_judger();
     

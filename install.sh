@@ -68,9 +68,16 @@ dockerPrep(){
 mkdir -p /opt/uoj_judger/log /opt/uoj_judger/uoj_judger/result
 touch /opt/uoj_judger/log/judge.log
 chown -R judger:judger /opt/uoj_judger/log /opt/uoj_judger/uoj_judger/result
-# Setup cgroup for judger
-mkdir -p /sys/fs/cgroup/uoj
-chown judger:judger /sys/fs/cgroup/uoj
+
+# 挂载 cgroup2 文件系统（使用 cgroup namespace 隔离）
+# 容器使用 cgroup: private，所以看到的是自己的 cgroup 子树
+# Docker 可能已经挂载了只读的 cgroup，需要重新挂载为可写
+if [ -d /sys/fs/cgroup ]; then
+  # 先尝试 umount 再重新 mount（需要 SYS_ADMIN）
+  umount /sys/fs/cgroup 2>/dev/null || true
+  mount -t cgroup2 none /sys/fs/cgroup 2>/dev/null || true
+fi
+
 if [ ! -f \"/opt/uoj_judger/.conf.json\" ]; then
   cd /opt/uoj_judger && sh install.sh -i
 fi

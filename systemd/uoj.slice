@@ -1,0 +1,30 @@
+# UOJ Judger Slice
+# 
+# 安装：sudo cp uoj.slice /etc/systemd/system/
+# 启用：sudo systemctl daemon-reload
+#
+# 这个 slice 用于隔离所有 UOJ 评测机相关的进程。
+# judge_client 使用 systemd-run --slice=uoj 来在此 slice 下创建 scope。
+
+[Unit]
+Description=UOJ Judger Slice
+Documentation=https://github.com/Vvauted/Re-UOJ-Judger
+Before=slices.target
+
+[Slice]
+# 委派 cgroup 控制权给子进程
+Delegate=yes
+
+# 资源限制（可根据服务器配置调整）
+# 内存限制：最大 16GB
+MemoryMax=16G
+# 禁用 swap
+MemorySwapMax=0
+# CPU 配额：最多使用所有核心
+# CPUQuota=400%  # 4 核
+# 最大进程数
+TasksMax=1024
+
+[Install]
+WantedBy=multi-user.target
+
